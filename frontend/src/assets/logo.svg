@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <style>
+      .dome { fill: #4B5563; }
+      .dome-light { fill: #6B7280; }
+      .sun { stroke: #F59E0B; stroke-width: 2.5; stroke-linecap: round; }
+      .blue-person { fill: #004C99; }
+      .orange-person { fill: #F05A28; }
+      .green-person { fill: #15803D; }
+      .hands { fill: #FFFFFF; }
+      .base-curve { fill: #1D4ED8; opacity: 0.9; }
+      .base-curve-green { fill: #15803D; opacity: 0.9; }
+    </style>
+  </defs>
+  
+  <!-- Sun Rays (Background Left) -->
+  <g class="sun">
+    <line x1="30" y1="50" x2="15" y2="40" />
+    <line x1="35" y1="42" x2="22" y2="28" />
+    <line x1="42" y1="35" x2="33" y2="18" />
+    <line x1="52" y1="32" x2="48" y2="12" />
+  </g>
+  
+  <!-- Parliament Dome -->
+  <path class="dome" d="M35 55 C35 30, 85 30, 85 55 Z" />
+  <rect class="dome" x="32" y="55" width="56" height="5" />
+  <!-- Pillars -->
+  <rect class="dome-light" x="35" y="60" width="6" height="20" />
+  <rect class="dome-light" x="48" y="60" width="6" height="20" />
+  <rect class="dome-light" x="66" y="60" width="6" height="20" />
+  <rect class="dome-light" x="79" y="60" width="6" height="20" />
+  
+  <!-- Flag Pole & Flag -->
+  <rect class="dome" x="59" y="10" width="2" height="20" />
+  <rect fill="#FF9933" x="61" y="10" width="16" height="4" />
+  <rect fill="#FFFFFF" x="61" y="14" width="16" height="4" />
+  <rect fill="#138808" x="61" y="18" width="16" height="4" />
+  
+  <!-- Three Figures -->
+  <!-- Left Blue Person -->
+  <circle class="blue-person" cx="35" cy="65" r="8" />
+  <path class="blue-person" d="M 15 95 C 15 75, 55 75, 55 95 Z" />
+  
+  <!-- Right Green Person -->
+  <circle class="green-person" cx="85" cy="65" r="8" />
+  <path class="green-person" d="M 65 95 C 65 75, 105 75, 105 95 Z" />
+  
+  <!-- Center Orange Person -->
+  <circle class="orange-person" cx="60" cy="60" r="10" />
+  <path class="orange-person" d="M 35 100 C 35 75, 85 75, 85 100 Z" />
+  
+  <!-- Folded Hands -->
+  <path class="hands" d="M 60 78 L 52 92 L 56 95 L 60 85 L 64 95 L 68 92 Z" />
+  
+  <!-- Curved Base -->
+  <path class="base-curve-green" d="M 5 95 Q 60 85 115 95 L 115 102 Q 60 92 5 102 Z" />
+  <path class="base-curve" d="M 10 98 Q 60 90 110 98 L 110 102 Q 60 94 10 102 Z" />
+</svg>
