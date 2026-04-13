@@ -134,6 +134,21 @@ def simulate_affidavit_data(name):
     """
     if not name:
         name = "Unknown"
+        
+    gen_commitments = [
+        "Setup Multi-Speciality Hospital",
+        "Expand Highway Infrastructure",
+        "Improve Rural Electrification",
+        "Digital Transformation of Schools",
+        "Subsidized Solar Grids for Farmers",
+        "Clean Drinking Water Project",
+        "Women Empowerment Centers",
+        "Free Public Wi-Fi Zones",
+        "Modernize Public Transport",
+        "Smart City Initiatives",
+        "Affordable Housing Scheme",
+        "Revamp Drainage System"
+    ]
     
     # Check if we have real data for this person
     if name in KNOWN_POLITICIANS:
@@ -157,10 +172,10 @@ def simulate_affidavit_data(name):
             ]
         }
         
+        selected_titles = random.sample(gen_commitments, 3)
         data["commitments"] = [
-            {"id": 1, "title": "Infrastructure Development", "status": "in-progress"},
-            {"id": 2, "title": "Digital Transformation", "status": "completed"},
-            {"id": 3, "title": "Social Welfare Schemes", "status": "in-progress"}
+            {"id": i+1, "title": title, "status": random.choice(["completed", "in-progress", "pending"])}
+            for i, title in enumerate(selected_titles)
         ]
         
         data["issues"] = [
@@ -194,10 +209,10 @@ def simulate_affidavit_data(name):
         ]
     }
     
+    selected_titles = random.sample(gen_commitments, 3)
     commitments = [
-        {"id": 1, "title": "Setup Multi-Speciality Hospital", "status": random.choice(["completed", "in-progress", "pending"])},
-        {"id": 2, "title": "Expand Highway Infrastructure", "status": random.choice(["completed", "in-progress", "pending"])},
-        {"id": 3, "title": "Improve Rural Electrification", "status": random.choice(["completed", "in-progress", "pending"])}
+        {"id": i+1, "title": title, "status": random.choice(["completed", "in-progress", "pending"])}
+        for i, title in enumerate(selected_titles)
     ]
     
     issues = [
