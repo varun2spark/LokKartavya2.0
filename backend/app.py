@@ -567,8 +567,10 @@ def register():
     if not data or not all(k in data for k in ("name", "email", "password")):
         return jsonify({"error": "Missing required fields: name, email, password"}), 400
         
+    email = data['email'].lower().strip()
+        
     # Check if user already exists
-    existing_user = User.query.filter_by(email=data['email']).first()
+    existing_user = User.query.filter_by(email=email).first()
     if existing_user:
         return jsonify({"error": "Email already registered"}), 409
         
@@ -579,7 +581,7 @@ def register():
         # Create new user
         new_user = User(
             name=data['name'],
-            email=data['email'],
+            email=email,
             password_hash=hashed_password
         )
         
@@ -597,8 +599,10 @@ def login():
     if not data or not all(k in data for k in ("email", "password")):
         return jsonify({"error": "Missing required fields: email, password"}), 400
         
+    email = data['email'].lower().strip()
+        
     # Find user by email
-    user = User.query.filter_by(email=data['email']).first()
+    user = User.query.filter_by(email=email).first()
     
     if user and bcrypt.check_password_hash(user.password_hash, data['password']):
         # Update last login time
