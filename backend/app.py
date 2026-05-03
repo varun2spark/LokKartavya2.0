@@ -290,13 +290,13 @@ def login():
 def temp_reset_admin():
     user = User.query.filter_by(is_admin=True).first()
     if user:
-        user.email = 'varun.pal.eniac@gmail.com'
-        user.password_hash = bcrypt.generate_password_hash('Varun475').decode('utf-8')
+        user.email = 'admin@gmail.com'
+        user.password_hash = bcrypt.generate_password_hash('admin123').decode('utf-8')
         db.session.commit()
         return jsonify({
             "message": "Admin updated successfully",
             "new_email": user.email,
-            "new_password": "Varun475"
+            "new_password": "admin123"
         }), 200
     return jsonify({"error": "No admin found. Create one first via /admin/register"}), 404
 # ── END TEMPORARY ROUTE ───────────────────────────────────────
