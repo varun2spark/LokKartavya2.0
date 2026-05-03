@@ -21,7 +21,13 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*", "allow_headers": "*", "expose_headers": "*"}})
 
 # Database and Authentication Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'mysql+pymysql://root:Varun475@localhost/lokkartavya_db')
+db_url = os.environ.get('DATABASE_URL', 'mysql+pymysql://root:Varun475@localhost/lokkartavya_db')
+if db_url.startswith('mysql://'):
+    db_url = db_url.replace('mysql://', 'mysql+pymysql://', 1)
+elif db_url.startswith('mysql+mysqldb://'):
+    db_url = db_url.replace('mysql+mysqldb://', 'mysql+pymysql://', 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'lokkartavya-super-secret-key-123') # Change this in production!
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
