@@ -74,6 +74,10 @@ class IssueReport(db.Model):
     def __repr__(self):
         return f'<IssueReport {self.id} for {self.politician_name}>'
 
+# Auto-create tables in the database (helpful for free-tier deployments without shell access)
+with app.app_context():
+    db.create_all()
+
 def get_politician_image(name, page_images=None):
     """
     Fetches the primary page image from Wikipedia API.
