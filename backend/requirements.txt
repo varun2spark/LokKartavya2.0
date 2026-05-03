@@ -1,0 +1,13 @@
+Flask
+Flask-Cors
+requests
+beautifulsoup4
+wikipedia
+duckduckgo-search
+gunicorn
+Flask-SQLAlchemy
+PyMySQL
+Flask-Bcrypt
+Flask-JWT-Extended
+python-dotenv
+cryptography

@@ -6,6 +6,10 @@ export default function Register() {
   const navigate = useNavigate();
   const { isAuthenticated } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -13,14 +17,33 @@ export default function Register() {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError('');
     
-    setTimeout(() => {
+    try {
+      const response = await fetch('http://localhost:5000/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email, password }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || data.msg || 'Failed to register');
+      }
+      
       alert('Account created successfully! Please sign in.');
       navigate('/login');
-    }, 600);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -35,19 +58,38 @@ export default function Register() {
             </div>
 
             <form onSubmit={handleSubmit}>
+                {error && <div className="error-message" style={{ color: 'red', marginBottom: '1rem', textAlign: 'center', fontSize: '0.9rem' }}>{error}</div>}
                 <div className="form-group">
                     <label>Full Name</label>
-                    <input type="text" required placeholder="John Doe" />
+                    <input 
+                      type="text" 
+                      required 
+                      placeholder="Khargosh" 
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
                 </div>
 
                 <div className="form-group">
                     <label>Email Address</label>
-                    <input type="email" required placeholder="you@example.com" />
+                    <input 
+                      type="email" 
+                      required 
+                      placeholder="you@example.com" 
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
                 </div>
                 
                 <div className="form-group">
                     <label>Password</label>
-                    <input type="password" required placeholder="Create a strong password" />
+                    <input 
+                      type="password" 
+                      required 
+                      placeholder="Create a strong password" 
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
                 </div>
                 
                 <button type="submit" className="btn w-100" style={{ padding: '1rem', marginTop: '0.5rem' }} disabled={isSubmitting}>

@@ -43,7 +43,7 @@ export default function Feedback() {
                     <input 
                       type="text" 
                       required 
-                      placeholder="John Doe" 
+                      placeholder="Khargosh" 
                       value={formData.name}
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
                     />

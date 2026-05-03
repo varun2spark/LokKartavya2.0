@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Politicians from './pages/Politicians';
 import PoliticianDetail from './pages/PoliticianDetail';
+import AdminDashboard from './pages/AdminDashboard';
 import { AuthContext } from './utils/AuthContext';
 
 function ProtectedRoute({ children }) {
@@ -33,6 +34,7 @@ function App() {
         <Route path="/politicians" element={<ProtectedRoute><Politicians /></ProtectedRoute>} />
         <Route path="/politician-detail" element={<ProtectedRoute><PoliticianDetail /></ProtectedRoute>} />
         <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
       </Routes>
     </>
   );

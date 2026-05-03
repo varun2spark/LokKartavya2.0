@@ -13,6 +13,8 @@ export default function PoliticianDetail() {
   // Issue Form state
   const [issueTitle, setIssueTitle] = useState('');
   const [issueDesc, setIssueDesc] = useState('');
+  const [issueGeotag, setIssueGeotag] = useState('');
+  const [issueImage, setIssueImage] = useState(null);
   const [submittingIssue, setSubmittingIssue] = useState(false);
 
   useEffect(() => {
@@ -43,18 +45,43 @@ export default function PoliticianDetail() {
     e.preventDefault();
     setSubmittingIssue(true);
     
+    const token = localStorage.getItem('lokkartavya_token');
+    if (!token) {
+      alert('You must be logged in to report an issue.');
+      setSubmittingIssue(false);
+      return;
+    }
+    
     try {
+      const formData = new FormData();
+      formData.append('title', issueTitle);
+      formData.append('description', issueDesc);
+      formData.append('politician_name', politician.name);
+      if (issueGeotag) formData.append('geotag', issueGeotag);
+      if (issueImage) formData.append('image', issueImage);
+
       const res = await fetch(`${API_BASE_URL}/issue`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: issueTitle, description: issueDesc })
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
       });
       if(res.ok) {
-        alert('Issue reported successfully. It will appear on the dashboard after review.');
+        alert('Issue reported successfully! It will appear on the dashboard after admin review.');
         setIssueTitle('');
         setIssueDesc('');
+        setIssueGeotag('');
+        setIssueImage(null);
+        // Refresh the politician details to show the new issue
+        const refreshRes = await fetch(`${API_BASE_URL}/leader?name=${encodeURIComponent(name)}`);
+        if (refreshRes.ok) {
+          const newData = await refreshRes.json();
+          setPolitician(newData);
+        }
       } else {
-        alert('Failed to report issue.');
+        const errorData = await res.json();
+        alert(`Failed to report issue: ${errorData.error || errorData.msg || 'Unknown error'}`);
       }
     } catch (e) {
       alert('Error submitting issue.');
@@ -213,15 +240,29 @@ export default function PoliticianDetail() {
 
             {/* Right Column: Reporting */}
             <div className="dashboard-section" style={{ background: 'var(--white)', border: '2px solid #F3F4F6' }}>
-                <h3 style={{ fontSize: '1.25rem' }}>Constituency Issues</h3>
-                <p style={{ color: 'var(--dark-light)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>Publicly reported problems in {politician.constituency || 'this constituency'}.</p>
+                <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Constituency Issues</h3>
                 
                 <div style={{ marginBottom: '2rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }}>
                     {politician.issues && politician.issues.length > 0 ? (
                       politician.issues.map((issue, idx) => (
-                        <div className="issue-card" key={idx}>
-                            <div className="issue-title">{issue.title}</div>
-                            <div className="issue-date">Reported on: {issue.date}</div>
+                        <div className="issue-card" key={idx} style={{ padding: '1rem', border: '1px solid #E5E7EB', borderRadius: '0.5rem', marginBottom: '1rem', background: '#F9FAFB' }}>
+                            <div className="issue-title" style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.5rem' }}>{issue.title}</div>
+                            {issue.description && <div style={{ fontSize: '0.9rem', color: '#4B5563', marginBottom: '0.5rem' }}>{issue.description}</div>}
+                            
+                            {issue.geotag && (
+                                <div style={{ fontSize: '0.85rem', color: '#6366F1', display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.5rem' }}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                                    {issue.geotag}
+                                </div>
+                            )}
+                            
+                            {issue.image_filename && (
+                                <div style={{ marginTop: '0.5rem' }}>
+                                    <img src={`${API_BASE_URL}/uploads/${issue.image_filename}`} alt="Issue Evidence" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '0.25rem' }} />
+                                </div>
+                            )}
+                            
+                            <div className="issue-date" style={{ fontSize: '0.8rem', color: '#9CA3AF', marginTop: '0.5rem' }}>Reported on: {issue.date}</div>
                         </div>
                       ))
                     ) : (
@@ -235,7 +276,14 @@ export default function PoliticianDetail() {
                             <input type="text" required placeholder="Brief title of the issue" style={{ fontSize: '0.9rem', padding: '0.6rem' }} value={issueTitle} onChange={e => setIssueTitle(e.target.value)} />
                         </div>
                         <div className="form-group" style={{ marginBottom: '1rem' }}>
-                            <textarea rows="3" required placeholder="Details..." style={{ fontSize: '0.9rem', padding: '0.6rem' }} value={issueDesc} onChange={e => setIssueDesc(e.target.value)}></textarea>
+                            <textarea rows="3" required placeholder="Details/Description..." style={{ fontSize: '0.9rem', padding: '0.6rem' }} value={issueDesc} onChange={e => setIssueDesc(e.target.value)}></textarea>
+                        </div>
+                        <div className="form-group" style={{ marginBottom: '1rem' }}>
+                            <input type="text" placeholder="Geotag (e.g., Street Name, Landmark)" style={{ fontSize: '0.9rem', padding: '0.6rem' }} value={issueGeotag} onChange={e => setIssueGeotag(e.target.value)} />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.85rem', color: '#4B5563', marginBottom: '0.25rem' }}>Upload Photo Evidence (Optional)</label>
+                            <input type="file" accept="image/*" style={{ fontSize: '0.9rem', padding: '0.6rem', border: '1px dashed #D1D5DB', width: '100%' }} onChange={e => setIssueImage(e.target.files[0])} />
                         </div>
                         <button type="submit" className="btn w-100" style={{ padding: '0.75rem', fontSize: '0.95rem' }} disabled={submittingIssue}>{submittingIssue ? 'Submitting...' : 'Submit Report'}</button>
                     </form>

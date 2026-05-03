@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../utils/AuthContext';
 
 export default function Navbar() {
-  const { isAuthenticated, logout } = useContext(AuthContext);
+  const { isAuthenticated, logout, user } = useContext(AuthContext);
   const location = useLocation();
 
   return (
@@ -20,6 +20,9 @@ export default function Navbar() {
           <Link to="/politicians" style={{ color: location.pathname === '/politicians' ? 'var(--primary)' : '' }}>Politicians</Link>
           <Link to="/about" style={{ color: location.pathname === '/about' ? 'var(--primary)' : '' }}>About Us</Link>
           <Link to="/feedback" style={{ color: location.pathname === '/feedback' ? 'var(--primary)' : '' }}>Feedback</Link>
+          {user?.is_admin && (
+            <Link to="/admin" style={{ color: location.pathname === '/admin' ? 'var(--primary)' : '' }}>Moderation</Link>
+          )}
           {isAuthenticated ? (
             <a href="#" className="nav-cta" onClick={(e) => { e.preventDefault(); logout(); }}>Logout</a>
           ) : (

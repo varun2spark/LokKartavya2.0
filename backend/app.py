@@ -5,37 +5,68 @@ import wikipedia
 import requests
 import random
 import os
-import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 from duckduckgo_search import DDGS
+from flask_sqlalchemy import SQLAlchemy
+from flask_bcrypt import Bcrypt
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from werkzeug.utils import secure_filename
+from flask import send_from_directory
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 # Enable CORS so React frontend running on different port can connect
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*", "allow_headers": "*", "expose_headers": "*"}})
 
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-FEEDBACKS_CSV = os.path.join(BASE_DIR, 'data_feedbacks.csv')
-ISSUES_CSV = os.path.join(BASE_DIR, 'data_issues.csv')
+# Database and Authentication Configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'mysql+pymysql://root:Varun475@localhost/lokkartavya_db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'lokkartavya-super-secret-key-123') # Change this in production!
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
+app.config['UPLOAD_FOLDER'] = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static', 'uploads')
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-def sanitize_csv(val):
-    val = str(val).strip()
-    if val and val[0] in ('=', '+', '-', '@'):
-        return "'" + val
-    return val
+db = SQLAlchemy(app)
+bcrypt = Bcrypt(app)
+jwt = JWTManager(app)
 
-# Initialize CSV data stores
-def init_db():
-    if not os.path.exists(FEEDBACKS_CSV):
-        with open(FEEDBACKS_CSV, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow(['Timestamp', 'Name', 'Subject', 'Message'])
-            
-    if not os.path.exists(ISSUES_CSV):
-        with open(ISSUES_CSV, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow(['Timestamp', 'Title', 'Description'])
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime, nullable=True)
+    is_admin = db.Column(db.Boolean, default=False)
 
-init_db()
+    def __repr__(self):
+        return f'<User {self.email}>'
+
+class Feedback(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    name = db.Column(db.String(100), nullable=False)
+    subject = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+
+    def __repr__(self):
+        return f'<Feedback {self.id}>'
+
+class IssueReport(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    politician_name = db.Column(db.String(100), nullable=False)
+    geotag = db.Column(db.String(255), nullable=True)
+    image_filename = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(20), default='pending')
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    def __repr__(self):
+        return f'<IssueReport {self.id} for {self.politician_name}>'
 
 def get_politician_image(name, page_images=None):
     """
@@ -305,7 +336,7 @@ def get_affidavit():
         return jsonify({"error": str(e)}), 500
 
 @lru_cache(maxsize=128)
-def fetch_leader_data(name):
+def fetch_leader_static_data(name):
     # Fetch Wikipedia info
     wiki_title = name
     wiki_summary = "Biography not available."
@@ -335,7 +366,7 @@ def fetch_leader_data(name):
         "assets": affidavit_data.get("assets"),
         "budget": affidavit_data.get("budget"),
         "commitments": affidavit_data.get("commitments"),
-        "issues": affidavit_data.get("issues"),
+        "simulated_issues": affidavit_data.get("issues"),
         "image": image
     }
 
@@ -351,7 +382,24 @@ def get_leader_full_info():
         return jsonify({"error": "Name parameter is required"}), 400
         
     try:
-        response = fetch_leader_data(name)
+        response = fetch_leader_static_data(name).copy()
+        
+        # Query real issues from database dynamically (not cached), only approved ones
+        real_issues = IssueReport.query.filter_by(politician_name=name, status='approved').order_by(IssueReport.timestamp.desc()).all()
+        issues_list = [
+            {
+                "id": issue.id, 
+                "title": issue.title, 
+                "description": issue.description, 
+                "date": issue.timestamp.strftime("%Y-%m-%d"),
+                "geotag": issue.geotag,
+                "image_filename": issue.image_filename
+            }
+            for issue in real_issues
+        ]
+        
+        response["issues"] = issues_list if issues_list else response["simulated_issues"]
+        
         return jsonify(response)
         
     except Exception as e:
@@ -362,7 +410,7 @@ def submit_feedback():
     """
     d) POST /feedback
     - Accept JSON: { name, subject, message }
-    - Store in memory (list)
+    - Store in MySQL database
     - Return success message
     """
     data = request.json
@@ -370,44 +418,206 @@ def submit_feedback():
         return jsonify({"error": "Missing required fields: name, subject, message"}), 400
         
     try:
-        with open(FEEDBACKS_CSV, 'a', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                sanitize_csv(data['name']), 
-                sanitize_csv(data['subject']), 
-                sanitize_csv(data['message'])
-            ])
+        new_feedback = Feedback(
+            name=data['name'],
+            subject=data['subject'],
+            message=data['message']
+        )
+        db.session.add(new_feedback)
+        db.session.commit()
         return jsonify({"message": "Feedback submitted successfully"}), 201
     except Exception as e:
+        db.session.rollback()
         return jsonify({"error": f"Failed to save feedback: {str(e)}"}), 500
 
 @app.route('/issue', methods=['POST'])
+@jwt_required()
 def submit_issue():
     """
     e) POST /issue
-    - Accept JSON: { title, description }
-    - Store in memory
+    - Accept multipart/form-data: { title, description, politician_name, geotag, image }
+    - Requires JWT Authentication
+    - Store in MySQL database
     - Return success message
     """
-    data = request.json
-    if not data or not all(k in data for k in ("title", "description")):
-        return jsonify({"error": "Missing required fields: title, description"}), 400
+    data = request.form
+    if not data or not all(k in data for k in ("title", "description", "politician_name")):
+        return jsonify({"error": "Missing required fields: title, description, politician_name"}), 400
+        
+    user_id = get_jwt_identity()
+    
+    image_filename = None
+    if 'image' in request.files:
+        file = request.files['image']
+        if file and file.filename != '':
+            filename = secure_filename(file.filename)
+            unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            file.save(file_path)
+            image_filename = unique_filename
         
     try:
-        with open(ISSUES_CSV, 'a', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                sanitize_csv(data['title']), 
-                sanitize_csv(data['description'])
-            ])
+        new_issue = IssueReport(
+            title=data['title'],
+            description=data['description'],
+            politician_name=data['politician_name'],
+            geotag=data.get('geotag'),
+            image_filename=image_filename,
+            status='pending',
+            user_id=user_id
+        )
+        db.session.add(new_issue)
+        db.session.commit()
         return jsonify({"message": "Issue reported successfully"}), 201
     except Exception as e:
+        db.session.rollback()
         return jsonify({"error": f"Failed to save issue: {str(e)}"}), 500
+
+@app.route('/uploads/<filename>')
+def serve_upload(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+# --- ADMIN ROUTES ---
+
+@app.route('/admin/issues', methods=['GET'])
+@jwt_required()
+def get_pending_issues():
+    user_id = get_jwt_identity()
+    user = db.session.get(User, user_id)
+    if not user or not user.is_admin:
+        return jsonify({"error": "Unauthorized"}), 403
+        
+    pending_issues = IssueReport.query.filter_by(status='pending').order_by(IssueReport.timestamp.desc()).all()
+    issues_list = [
+        {
+            "id": issue.id, 
+            "title": issue.title, 
+            "description": issue.description, 
+            "politician_name": issue.politician_name,
+            "date": issue.timestamp.strftime("%Y-%m-%d %H:%M"),
+            "geotag": issue.geotag,
+            "image_filename": issue.image_filename,
+            "user_id": issue.user_id
+        }
+        for issue in pending_issues
+    ]
+    return jsonify(issues_list), 200
+
+@app.route('/admin/issues/live', methods=['GET'])
+@jwt_required()
+def get_live_issues():
+    user_id = get_jwt_identity()
+    user = db.session.get(User, user_id)
+    if not user or not user.is_admin:
+        return jsonify({"error": "Unauthorized"}), 403
+        
+    live_issues = IssueReport.query.filter_by(status='approved').order_by(IssueReport.timestamp.desc()).all()
+    issues_list = [
+        {
+            "id": issue.id, 
+            "title": issue.title, 
+            "description": issue.description, 
+            "politician_name": issue.politician_name,
+            "date": issue.timestamp.strftime("%Y-%m-%d %H:%M"),
+            "geotag": issue.geotag,
+            "image_filename": issue.image_filename,
+            "user_id": issue.user_id
+        }
+        for issue in live_issues
+    ]
+    return jsonify(issues_list), 200
+
+@app.route('/admin/issues/<int:issue_id>/approve', methods=['POST'])
+@jwt_required()
+def approve_issue(issue_id):
+    user_id = get_jwt_identity()
+    user = db.session.get(User, user_id)
+    if not user or not user.is_admin:
+        return jsonify({"error": "Unauthorized"}), 403
+        
+    issue = db.get_or_404(IssueReport, issue_id)
+    issue.status = 'approved'
+    db.session.commit()
+    return jsonify({"message": "Issue approved successfully"}), 200
+
+@app.route('/admin/issues/<int:issue_id>/reject', methods=['POST'])
+@jwt_required()
+def reject_issue(issue_id):
+    user_id = get_jwt_identity()
+    user = db.session.get(User, user_id)
+    if not user or not user.is_admin:
+        return jsonify({"error": "Unauthorized"}), 403
+        
+    issue = db.get_or_404(IssueReport, issue_id)
+    issue.status = 'rejected'
+    db.session.commit()
+    return jsonify({"message": "Issue rejected successfully"}), 200
+
+# --- AUTHENTICATION ROUTES ---
+
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.json
+    if not data or not all(k in data for k in ("name", "email", "password")):
+        return jsonify({"error": "Missing required fields: name, email, password"}), 400
+        
+    # Check if user already exists
+    existing_user = User.query.filter_by(email=data['email']).first()
+    if existing_user:
+        return jsonify({"error": "Email already registered"}), 409
+        
+    try:
+        # Hash the password
+        hashed_password = bcrypt.generate_password_hash(data['password']).decode('utf-8')
+        
+        # Create new user
+        new_user = User(
+            name=data['name'],
+            email=data['email'],
+            password_hash=hashed_password
+        )
+        
+        db.session.add(new_user)
+        db.session.commit()
+        
+        return jsonify({"message": "User registered successfully"}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Registration failed: {str(e)}"}), 500
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    if not data or not all(k in data for k in ("email", "password")):
+        return jsonify({"error": "Missing required fields: email, password"}), 400
+        
+    # Find user by email
+    user = User.query.filter_by(email=data['email']).first()
+    
+    if user and bcrypt.check_password_hash(user.password_hash, data['password']):
+        # Update last login time
+        user.last_login = datetime.utcnow()
+        db.session.commit()
+        
+        # Generate JWT token
+        access_token = create_access_token(identity=str(user.id))
+        return jsonify({
+            "message": "Login successful",
+            "token": access_token,
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "last_login": user.last_login.isoformat() if user.last_login else None,
+                "is_admin": user.is_admin
+            }
+        }), 200
+    else:
+        return jsonify({"error": "Invalid email or password"}), 401
 
 if __name__ == '__main__':
     # Get port from environment variable (default to 5000)
     port = int(os.environ.get('PORT', 5000))
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     # Run server on 0.0.0.0 so it's accessible from outside the container
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=debug_mode)
