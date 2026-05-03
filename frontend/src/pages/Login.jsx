@@ -1,6 +1,7 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../utils/AuthContext';
+import { API_BASE_URL } from '../utils/api';
 
 export default function Login() {
   const { login, isAuthenticated } = useContext(AuthContext);
@@ -22,7 +23,7 @@ export default function Login() {
     setError('');
     
     try {
-      const response = await fetch('http://localhost:5000/login', {
+      const response = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

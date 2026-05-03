@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../utils/AuthContext';
+import { API_BASE_URL } from '../utils/api';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -23,7 +24,7 @@ export default function Register() {
     setError('');
     
     try {
-      const response = await fetch('http://localhost:5000/register', {
+      const response = await fetch(`${API_BASE_URL}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
